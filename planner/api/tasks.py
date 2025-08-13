@@ -1,82 +1,54 @@
 import frappe
 from frappe.utils import add_days, date_diff
 
-from erpnext.setup.doctype.employee.employee import get_holiday_list_for_employee
-
 
 @frappe.whitelist()
 def get_events(month_start, month_end, employee_filters={}, task_filters={}):
-
-	holidays = get_holidays(month_start, month_end, employee_filters)
-	tasks = get_tasks(month_start, month_end, employee_filters,task_filters)
-	leaves = get_leaves(month_start, month_end, employee_filters)
-	events = {}
-
-	for even in [holidays, tasks, leaves]:
-		for key, value in even.items():
-			if key in events:
-				events[key].extend(value)
-			else:
-				events[key] = value
-	return events
+        tasks = get_tasks(month_start, month_end, employee_filters, task_filters)
+        return tasks
 
 
-def get_holidays(month_start: str, month_end: str, employee_filters: dict[str, str]) :
-	holidays = {}
-	holiday_lists = {}
+def get_tasks(month_start: str, month_end: str, employee_filters: dict[str, str], task_filters):
+        cond = "AND task.status != 'Template' "
 
-	for employee in frappe.get_list("Employee", filters=employee_filters, pluck="name"):
-		if not (holiday_list := get_holiday_list_for_employee(employee, raise_exception=False)):
-			continue
-		if holiday_list not in holiday_lists:
-			holiday_lists[holiday_list] = frappe.get_all(
-				"Holiday",
-				filters={"parent": holiday_list, "holiday_date": ["between", [month_start, month_end]]},
-				fields=["name as holiday", "holiday_date", "description", "weekly_off"],
-			)
-		holidays[employee] = holiday_lists[holiday_list].copy()
+        for key, value in task_filters.items():
+                cond += f"AND task.{key} = '{value}' "
 
-	return holidays
+        tasks = frappe.db.sql(
+                f"""
+                SELECT task.name, task.exp_start_date as start_date, task.exp_end_date as end_date,
+                       task.project, task.subject, task.status, todo.allocated_to as user,
+                       task.color, task.completed_on
+                FROM `tabTask` as task
+                JOIN `tabToDo` as todo ON todo.reference_name = task.name
+                        AND todo.reference_type = 'Task'
+                        AND todo.status = 'Open'
+                WHERE task.exp_start_date <= "{month_end}"
+                AND task.exp_end_date >= "{month_start}"
+                {cond}
+                """,
+                as_dict=True,
+        )
 
+        user_tasks = {}
+        for task in tasks:
+                if task.project:
+                        task.project_name = frappe.db.get_value('Project', task.project, 'project_name')
 
-def get_tasks(month_start: str, month_end: str, employee_filters: dict[str, str],task_filters):
+                user = task.user
+                if user not in user_tasks:
+                        user_tasks[user] = []
+                user_tasks[user].append(task)
+                if not task.get('color'):
+                        task.color = "#EFF6FE"
 
-	cond = "AND task.status != 'Template' "
+                if task.status == "Completed":
+                        task.color = "#dcfae7"
 
-	for key, value in task_filters.items():
-		cond += f"AND task.{key} = '{value}' "
-	
-	tasks = frappe.db.sql(f"""
-		SELECT task.name, task.exp_start_date as start_date, task.exp_end_date as end_date, task.project, task.subject, task.status, employee_item.employee, task.color, task.completed_on
-		FROM `tabTask` as task
-		JOIN `tabEmployee Item` as employee_item ON task.name = employee_item.parent
-		WHERE employee_item.parenttype = 'Task'
-		AND employee_item.parentfield = 'employees'
-		AND task.exp_start_date <= "{month_end}"
-		AND task.exp_end_date >= "{month_start}"
-		{cond}
-		""", as_dict=True)
-		
-	# group tasks by employee
-	employee_tasks = {}
-	for task in tasks:
-		# Get the project name
-		if task.project:
-			task.project_name =  frappe.db.get_value('Project', task.project, 'project_name')
-		
-		if task.employee not in employee_tasks:
-			employee_tasks[task.employee] = []
-		employee_tasks[task.employee].append(task)
-		if(not task.get('color')):
-			task.color = "#EFF6FE"
-		
-		if task.status == "Completed":
-			task.color = "#dcfae7"
-		
-		if task.status == "Overdue":
-			task.color = "#fdf0f0"
+                if task.status == "Overdue":
+                        task.color = "#fdf0f0"
 
-	return employee_tasks
+        return user_tasks
 
 
 def get_leaves(month_start, month_end, employee_filters):
