@@ -442,6 +442,10 @@ def get_task(name):
 		for a in assignments
 	]
 
+	# Include elevator fields if present on the doctype
+	task_dict["elevator"] = task.get("elevator") or None
+	task_dict["elevator_address"] = task.get("elevator_address") or ""
+
 	return task_dict
 
 @frappe.whitelist()
@@ -457,6 +461,9 @@ def update_task(task_doc):
 	task.priority = task_doc.get('priority')
 	task.project = task_doc.get('project', None)
 	task.completed_on = task_doc.get('completed_on', None)
+
+	if task_doc.get('elevator') is not None:
+		task.elevator = task_doc.get('elevator')
 
 	task.save()
 
