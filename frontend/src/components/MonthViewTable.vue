@@ -25,7 +25,10 @@
             v-for="(day, idx) in daysOfMonth"
             :key="idx"
             class="font-medium border-b min-w-32"
-            :class="{ 'border-l': idx }"
+            :class="{
+              'border-l': idx,
+              'shadow-[inset_0_0_0_1.5px_#1e3a5f,0_0_6px_1px_rgba(30,58,95,0.25)]': day.date === dayjs().format('YYYY-MM-DD'),
+            }"
           >
             {{ day.dayName }} {{ dayjs(day.date).format('DD') }}
           </th>

@@ -74,6 +74,26 @@
             placeholder="Select end date & time"
           />
         </div>
+        <template v-if="isElevatorInstalled">
+          <div>
+            <label class="block text-xs text-ink-gray-5 mb-1.5">Elevator</label>
+            <Link
+              doctype="Elevator"
+              v-model="form.elevator"
+              placeholder="Select Elevator"
+              class="overflow-hidden"
+            />
+          </div>
+          <div>
+            <label class="block text-xs text-ink-gray-5 mb-1.5">Elevator Address</label>
+            <FormControl
+              type="input"
+              v-model="form.elevator_address"
+              placeholder="Auto-filled from elevator"
+              disabled
+            />
+          </div>
+        </template>
         <div class="w-full col-span-2">
           <label class="block text-xs text-ink-gray-5 mb-1.5">
             Assign To <span class="text-ink-red-3">*</span>
@@ -157,6 +177,8 @@ const emit = defineEmits(['update'])
 
 const show = defineModel()
 
+const isElevatorInstalled = window.is_elevator_installed === true
+
 const form = reactive({
   task: null,
   project: null,
@@ -169,6 +191,8 @@ const form = reactive({
   users: [],
   completed_by: null,
   completed_on: '',
+  elevator: null,
+  elevator_address: '',
 })
 
 const _taskName = ref(props.taskName)
@@ -211,6 +235,8 @@ const task = createResource({
 
     form.completed_on = data.completed_on
     form.project = data.project
+    form.elevator = data.elevator || null
+    form.elevator_address = data.elevator_address || ''
   },
 })
 
@@ -294,6 +320,7 @@ const submitTask = async (close) => {
         users: form.users || [],
         description: form.description,
         completed_on: form.completed_on || null,
+        elevator: form.elevator || null,
       },
       close,
     )
@@ -332,6 +359,26 @@ watch(
     if (!newVal) return
     _taskName.value = newVal
     task.fetch()
+  },
+)
+
+watch(
+  () => form.elevator,
+  async (newVal) => {
+    if (!newVal) {
+      form.elevator_address = ''
+      return
+    }
+    try {
+      const result = await call('frappe.client.get_value', {
+        doctype: 'Elevator',
+        filters: newVal,
+        fieldname: 'title',
+      })
+      form.elevator_address = result?.title || ''
+    } catch {
+      form.elevator_address = ''
+    }
   },
 )
 </script>

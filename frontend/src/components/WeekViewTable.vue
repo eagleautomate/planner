@@ -28,6 +28,7 @@
             :class="{
               'border-l': idx,
               'border-r': idx === daysOfWeek.length - 1,
+              'shadow-[inset_0_0_0_1.5px_#1e3a5f,0_0_6px_1px_rgba(30,58,95,0.25)]': day.date === dayjs().format('YYYY-MM-DD'),
             }"
           >
             {{ day.dayName }} {{ dayjs(day.date).format('DD') }}
